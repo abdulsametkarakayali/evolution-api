@@ -786,31 +786,37 @@ export class ChatwootService {
           nameContact = `${group.subject} (GROUP)`;
 
           const participantId = participantJid?.split('@')?.[0];
-          const picture_url = await this.waMonitor.waInstances[instance.instanceName].profilePicture(participantId);
-          this.logger.verbose(`Participant profile picture URL: ${JSON.stringify(picture_url)}`);
 
-          const findParticipant = participantId ? await this.findContact(instance, participantId) : null;
+          // An outgoing message's pushName is the account owner's own WhatsApp
+          // display name (e.g. "Você" on a pt-BR phone) and its participant is
+          // the owner itself, so there is no participant contact to name here.
+          if (!body.key.fromMe && participantId) {
+            const picture_url = await this.waMonitor.waInstances[instance.instanceName].profilePicture(participantId);
+            this.logger.verbose(`Participant profile picture URL: ${JSON.stringify(picture_url)}`);
 
-          if (findParticipant) {
-            this.logger.verbose(
-              `Found participant: ID:${findParticipant.id} - Name: ${findParticipant.name} - identifier: ${findParticipant.identifier}`,
-            );
-            if (!findParticipant.name || findParticipant.name === chatId) {
-              await this.updateContact(instance, findParticipant.id, {
-                name: body.pushName,
-                avatar_url: picture_url.profilePictureUrl || null,
-              });
+            const findParticipant = await this.findContact(instance, participantId);
+
+            if (findParticipant) {
+              this.logger.verbose(
+                `Found participant: ID:${findParticipant.id} - Name: ${findParticipant.name} - identifier: ${findParticipant.identifier}`,
+              );
+              if (!findParticipant.name || findParticipant.name === chatId) {
+                await this.updateContact(instance, findParticipant.id, {
+                  name: body.pushName,
+                  avatar_url: picture_url.profilePictureUrl || null,
+                });
+              }
+            } else {
+              await this.createContact(
+                instance,
+                participantId?.split(':')?.[0],
+                filterInbox.id,
+                false,
+                body.pushName,
+                picture_url.profilePictureUrl || null,
+                participantJid,
+              );
             }
-          } else {
-            await this.createContact(
-              instance,
-              participantId?.split(':')?.[0],
-              filterInbox.id,
-              false,
-              body.pushName,
-              picture_url.profilePictureUrl || null,
-              participantJid,
-            );
           }
         }
 
